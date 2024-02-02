@@ -19,7 +19,7 @@ or by downloading a binary from [the lego Releases page](https://github.com/go-a
 - Download legocron:
 
 ```shell
-wget https://raw.githubusercontent.com/linsomniac/legocron/1.0/legocron
+wget https://raw.githubusercontent.com/linsomniac/legocron/main/legocron
 chmod 755 legocron
 mv legocron /usr/local/sbin
 ```
