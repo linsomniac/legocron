@@ -3,7 +3,7 @@ LetsEncrypt automation wrapper for LeGo
 # Overview
 
 This script automates the request and renew of LetsEncrypt certs using
-LeGo ( https://github.com/go-acme/lego ).  It makes it as easy as to
+[LeGo](https://github.com/go-acme/lego).  It makes it as easy as to
 create a cron job that runs: 
 
     legocron www.example.com altname.example.com foo.example.com
@@ -18,13 +18,21 @@ or by downloading a binary from [the lego Releases page](https://github.com/go-a
 
 - Download legocron:
 
+```shell
+wget https://raw.githubusercontent.com/linsomniac/legocron/1.0/legocron
+chmod 755 legocron
+mv legocron /usr/local/sbin
+```
+
 - Edit "legocron" and set "EMAIL_ADDR" and select a "LEGO_ARGS" provider option.
 
 - Run "legocron" with any certificate names you want to request (use staging for testing):
 
-    legocron --staging www.example.com
-    # or:
-    legocron --staging www.example.com altname.example.com foo.example.com
+```shell
+legocron --staging www.example.com
+# or:
+legocron --staging www.example.com altname.example.com foo.example.com
+```
 
 - Check the certs in "/usr/local/lib/legocron/certificates"
 
@@ -32,7 +40,7 @@ or by downloading a binary from [the lego Releases page](https://github.com/go-a
 
 - Set up legocron in cron:
 
-    0 0 * * * root /usr/local/bin/legocron www.example.com
+    0 0 * * * root /usr/local/sbin/legocron www.example.com
 
 - Optionally: Write a post-cert script in "/usr/local/lib/legocron/post_cert_hook" and
   make it executable, with any steps to take after a certificate has been issued/renewed.
