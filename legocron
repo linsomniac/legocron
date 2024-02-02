@@ -1,0 +1,91 @@
+#!/bin/bash -eu
+#  vim: ts=4 sw=4 ai et
+#
+#  Issue or renew a LetsEncrypt cert using Lego  https://github.com/go-acme/lego
+#
+#  Written by: Sean Reifschneider - https://github.com/linsomniac/legocron - 2024-02
+#  License: Creative Commons Zero v1.0 Universal
+#
+#  To use:
+#    - Set EMAIL_ADDR below
+#    - Modify "LEGO_ARGS" for the provider you want to use.
+#    - Run "legocron --staging www.example.com" to generate a staging cert.
+#    - Run "legocron www.example.com" to generate a real cert.
+#
+#  This is a wrapper script for "lego" ( https://github.com/go-acme/lego?tab=readme-ov-file )
+#  that automates the certificate request/renew cycle.
+#
+#  Run it with a list of names you want on the cert at the command-line, optionally with
+#  "--staging" to generate a staging cert, and it will request a cert.  Run it again and
+#  it will do the renewal.  Change the command-line arguments (say by adding a new name)
+#  and it will request a cert with the new names.
+#
+#  If "post_cert_hook" exists under $LEGO_DIR and is executable, it will be run after
+#  a cert is issued or renewed.  That script can check $LEGO_POST_MODE for "run" or
+#  "renew" to see if it's a new or reissued cert.  Other environment variables include
+#  "PRIMARY_NAME", "DOMAINS_ARG" (with "--domains <NAME> --domains <NAME> [...]",
+#  and "STAGING_ARG" which is empty if not running against the staging environment.
+##############################################################################
+
+#  Uncomment and set
+#EMAIL_ADDR=user@example.com
+
+#  PROVIDERS
+#  See https://go-acme.github.io/lego/usage/cli/obtain-a-certificate/
+#  for more documentation on all available providers and options.
+
+#  HTTP provider
+LEGO_ARGS="--http"
+
+#  To use AWS Route53 provider, set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and uncomment:
+#  See: https://go-acme.github.io/lego/dns/route53/
+#LEGO_ARGS="--dns route53 --dns.resolvers 8.8.8.8"
+
+##############################################################################
+
+LEGO_DIR=/usr/local/lib/legocron
+
+export PRIMARY_NAME=""
+export DOMAINS_ARG=""
+export STAGING_ARG=""
+while [ "$#" -gt 0 ]; do
+    if [ "x${1}" = x--staging ]; then
+        STAGING_ARG="--server=https://acme-staging-v02.api.letsencrypt.org/directory"
+        shift
+        continue
+    fi
+
+    [ "$PRIMARY_NAME" = "" ] && PRIMARY_NAME=$1
+    DOMAINS_ARG="$DOMAINS_ARG --domains $1"
+    shift
+done
+DOMAINS_ARG="${DOMAINS_ARG## }"
+
+if [ "$DOMAINS_ARG" = "" ]; then
+    echo "usage: ${0##*/} [--staging] <PRIMARY_DOMAIN_NAME> [<SAN>] [...]"
+    exit 1
+fi
+
+DOMAINS_SHA=$(echo "x $STAGING_ARG $DOMAINS_ARG $PRIMARY_NAME" | sort | sha1sum)
+DOMAINS_SHA=${DOMAINS_SHA%% *}
+
+STATE_DIR="$LEGO_DIR/state"
+mkdir -p "$STATE_DIR"
+CERT_HASH_FILE="$STATE_DIR/${PRIMARY_NAME}.namehash"
+
+COMMAND_ARG="run"
+export LEGO_POST_MODE=run
+POST_ARG=""
+[ -x "$LEGO_DIR/post_cert_hook" ] && POST_ARG="--run-hook $LEGO_DIR/post_cert_hook"
+if [ -e "$CERT_HASH_FILE" ] && [ "$(cat $CERT_HASH_FILE)" = "$DOMAINS_SHA" ]; then
+    COMMAND_ARG="renew"
+    LEGO_POST_MODE=renew
+    [ -x "$LEGO_DIR/post_cert_hook" ] && POST_ARG="--renew-hook $LEGO_DIR/post_cert_hook"
+fi
+
+lego --accept-tos=true --email "$EMAIL_ADDR" --path "$LEGO_DIR" $STAGING_ARG $LEGO_ARGS $DOMAINS_ARG $COMMAND_ARG $POST_ARG
+RETCODE=$?
+
+[ "$RETCODE" -eq 0 ] && echo "$DOMAINS_SHA" >"$CERT_HASH_FILE"
+
+exit "$RETCODE"
