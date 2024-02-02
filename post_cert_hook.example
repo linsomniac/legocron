@@ -1,0 +1,4 @@
+#!/bin/sh
+
+[ -d /etc/apache2 ] && systemctl reload apache2
+[ -d /etc/haproxy ] && systemctl reload haproxy
